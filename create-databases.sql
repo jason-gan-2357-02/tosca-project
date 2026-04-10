@@ -13,16 +13,15 @@ BEGIN
 END
 GO
 
--- Create tosca_services database
-IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'tosca_services')
+-- Create tosca_test_data database
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'tosca_test_data')
 BEGIN
-    CREATE DATABASE [tosca_services];
-	ALTER DATABASE [tosca_services] SET READ_COMMITTED_SNAPSHOT ON;
-    PRINT 'Database [tosca_services] created.';
+    CREATE DATABASE [tosca_test_data];
+    PRINT 'Database [tosca_test_data] created.';
 END
 ELSE
 BEGIN
-    PRINT 'Database [tosca_services] already exists.';
+    PRINT 'Database [tosca_test_data] already exists.';
 END
 GO
 
@@ -73,8 +72,8 @@ BEGIN
 END
 GO
 
--- Grant [tosca_user] full access to [tosca_services]
-USE [tosca_services];
+-- Grant [tosca_user] full access to [tosca_test_data]
+USE [tosca_test_data];
 GO
 
 IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'tosca_user')
@@ -84,10 +83,10 @@ BEGIN
     -- Add user to the db_owner role for full access
     ALTER ROLE [db_owner] ADD MEMBER [tosca_user];
     
-    PRINT 'User [tosca_user] created in [tosca_services] and granted db_owner permissions.';
+    PRINT 'User [tosca_user] created in [tosca_test_data] and granted db_owner permissions.';
 END
 ELSE
 BEGIN
-    PRINT 'User [tosca_user] already exists in [tosca_services].';
+    PRINT 'User [tosca_user] already exists in [tosca_test_data].';
 END
 GO

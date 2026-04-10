@@ -2,25 +2,23 @@
 USE [tools];
 GO
 
-CREATE OR ALTER PROCEDURE [backup_all_databases]
-AS
+CREATE OR ALTER PROCEDURE [backup_all_databases] AS
 BEGIN
 
-	DECLARE @backuproot VARCHAR(40);
-	DECLARE @backupdir  VARCHAR(40);
-	DECLARE @dbname     VARCHAR(40);
-	DECLARE @filepath   VARCHAR(100);
-	DECLARE @rightnow   DATETIME = GETDATE();
+	DECLARE @dailyBackupDir   VARCHAR(50) = 'H:\Backup\Daily';
+	DECLARE @hourlyBackupDir  VARCHAR(50) = 'H:\Backup\Hourly';
+	DECLARE @backupdir        VARCHAR(50);
+	DECLARE @dbname           VARCHAR(50);
+	DECLARE @filepath         VARCHAR(50);
+	DECLARE @rightnow         DATETIME = GETDATE();
 
-	SET @backuproot = 'C:\Backup';
-
-	IF DATEPART(HOUR, @rightnow) = 0
+	IF DATEPART(HOUR, @rightnow) = 0 
 	BEGIN
-		SET @backupdir = @backuproot + '\Daily\' + FORMAT(@rightnow, 'yyyy-MMdd-HHmmss');
-	END
+		SET @backupdir = @dailyBackupDir + '\' + FORMAT(@rightnow, 'yyyy-MMdd-HHmmss');
+	END 
 	ELSE
 	BEGIN
-		SET @backupdir = @backuproot + '\Hourly\' + FORMAT(@rightnow, 'yyyy-MMdd-HHmmss');
+		SET @backupdir = @hourlyBackupDir + '\' + FORMAT(@rightnow, 'yyyy-MMdd-HHmmss');
 	END
 
 	EXEC master.sys.xp_create_subdir @backupdir;
@@ -29,11 +27,11 @@ BEGIN
 	SET @filepath = @backupdir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
-	SET @dbname = 'msdb';
+	SET @dbname = 'model';
 	SET @filepath = @backupdir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
-	SET @dbname = 'model';
+	SET @dbname = 'msdb';
 	SET @filepath = @backupdir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
@@ -45,7 +43,7 @@ BEGIN
 	SET @filepath = @backupdir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
-	SET @dbname = 'tosca_services';
+	SET @dbname = 'tosca_test_data';
 	SET @filepath = @backupdir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
@@ -53,88 +51,129 @@ END;
 GO
 
 PRINT 'Stored procedure [backup_all_databases] created.';
-
--- Create job for automated backup of all databases
-USE [msdb];
 GO
 
-DECLARE @jobId BINARY(16);
-DECLARE @jobName NVARCHAR(50);
-DECLARE @schedId INT;
-DECLARE @schedName NVARCHAR(50);
-
-SET @jobName = N'Automated_Backups';
-SET @schedName = N'Schedule_Every_4_Hours';
-
--- Check if schedule already exists and delete it
-IF EXISTS (SELECT schedule_id FROM dbo.sysschedules WHERE name = @schedName)
+CREATE OR ALTER PROCEDURE [delete_schedule_if_exists] 
+	@schedule_name NVARCHAR(50)
+AS
 BEGIN
-    PRINT 'Schedule [' + @schedName + '] already exists. Deleting...';
-END	
+	IF NOT EXISTS (SELECT schedule_id FROM msdb.dbo.sysschedules WHERE name = @schedule_name)
+	BEGIN
+		RETURN;
+	END	
 
-DECLARE sched_cursor CURSOR FOR 
-    SELECT schedule_id 
-    FROM dbo.sysschedules 
-    WHERE name = @schedName;
+	PRINT 'Schedule [' + @schedule_name + '] already exists. Deleting...';
 
-OPEN sched_cursor;
-FETCH NEXT FROM sched_cursor INTO @schedId;
+	DECLARE @schedId INT;
 
-WHILE @@FETCH_STATUS = 0
+	DECLARE schedCursor CURSOR FOR 
+    	SELECT schedule_id 
+    	FROM msdb.dbo.sysschedules 
+    	WHERE name = @schedule_name;
+
+	OPEN schedCursor;
+	FETCH NEXT FROM schedCursor INTO @schedId;
+
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		EXEC msdb.dbo.sp_delete_schedule @schedule_id = @schedId, @force_delete = 1; 
+		FETCH NEXT FROM schedCursor INTO @schedId;
+	END
+
+	CLOSE schedCursor;
+	DEALLOCATE schedCursor;
+END;
+GO
+
+PRINT 'Stored procedure [delete_schedule_if_exists] created.';
+GO
+
+CREATE OR ALTER PROCEDURE [delete_job_if_exists] 
+	@job_name NVARCHAR(50)
+AS
 BEGIN
-    EXEC dbo.sp_delete_schedule 
-        @schedule_id = @schedId, 
-        @force_delete = 1; 
-    FETCH NEXT FROM sched_cursor INTO @schedId;
-END
+	IF EXISTS (SELECT job_id FROM msdb.dbo.sysjobs WHERE name = @job_name)
+	BEGIN
+    	PRINT 'Job [' + @job_name + '] already exists. Deleting...';
+    	EXEC msdb.dbo.sp_delete_job @job_name = @job_name, @delete_unused_schedule = 1;
+	END
+END;
+GO
 
-CLOSE sched_cursor;
-DEALLOCATE sched_cursor;
+PRINT 'Stored procedure [delete_job_if_exists] created.';
+GO
 
--- Check if the job already exists and delete it
-IF EXISTS (SELECT job_id FROM msdb.dbo.sysjobs WHERE name = @jobName)
+CREATE OR ALTER PROCEDURE [create_job] 
+	@job_name NVARCHAR(50),
+	@description NVARCHAR(255),
+	@subsystem NVARCHAR(50),
+	@command NVARCHAR(MAX),
+	@freq_type INT, -- daily
+	@freq_interval INT, 
+	@freq_subday_type INT,
+	@freq_subday_interval INT,
+	@active_start_time INT
+AS
 BEGIN
-    PRINT 'Job [' + @jobName + '] already exists. Deleting...';
-    EXEC sp_delete_job @job_name = @jobName, @delete_unused_schedule = 1;
-END
 
--- 1. Create the Job
-EXEC sp_add_job 
-    @job_name = @jobName, 
-    @enabled = 1, 
-    @description = N'Executes the backup_databases procedure every 4 hours.',
-    @job_id = @jobId OUTPUT;
+	DECLARE @job_id BINARY(16);
+	DECLARE @schedule_name NVARCHAR(50) = @job_name + ' Schedule';
+	DECLARE @stepName NVARCHAR(50) = @job_name + ' Step';
 
--- 2. Add the Step
-EXEC sp_add_jobstep 
-    @job_id = @jobId, 
-    @step_name = N'Run Backup Stored Procedure', 
-    @subsystem = N'TSQL', 
-    @command = N'EXEC dbo.backup_all_databases;', 
-    @database_name = N'tools',
-    @retry_attempts = 1,
-    @retry_interval = 5;
+	EXEC dbo.delete_schedule_if_exists @schedule_name = @schedule_name;
+	EXEC dbo.delete_job_if_exists @job_name = @job_name;
 
--- 3. Create the Schedule (Every day, every 4 hours)
--- freq_type 4 = Daily
--- freq_subday_type 8 = Hours
--- freq_subday_interval 4 = Every 4 hours
-EXEC sp_add_schedule 
-    @schedule_name = @schedName, 
-    @freq_type = 4, 
-    @freq_interval = 1, 
-    @freq_subday_type = 8, 
-    @freq_subday_interval = 4, 
-    @active_start_time = 000000; -- Start at midnight (HHMMSS)
+	EXEC msdb.dbo.sp_add_job 
+		@job_name = @job_name, 
+		@enabled = 1, 
+		@description = @description,
+		@job_id = @job_id OUTPUT;
 
--- 4. Attach the Schedule to the Job
-EXEC sp_attach_schedule 
-    @job_id = @jobId, 
-    @schedule_name = @schedName;
+	-- 2. Add the Step
+	EXEC msdb.dbo.sp_add_jobstep 
+		@job_id = @job_id, 
+		@step_name = @stepName, 
+		@subsystem = @subsystem, 
+		@command = @command, 
+		@database_name = N'tools',
+		@retry_attempts = 1,
+		@retry_interval = 5;
 
--- 5. Target the Job to the local server
-EXEC sp_add_jobserver 
-    @job_id = @jobId, 
-    @server_name = N'(local)';
+	-- 3. Create the Schedule (Every day, every 4 hours)
+	EXEC msdb.dbo.sp_add_schedule 
+		@schedule_name = @schedule_name, 
+		@freq_type = @freq_type,
+		@freq_interval = @freq_interval, 
+		@freq_subday_type = @freq_subday_type,
+		@freq_subday_interval = @freq_subday_interval,
+		@active_start_time = @active_start_time;
 
-PRINT 'Job [' + @jobName + '] with schedule [' + @schedName + '] created.';
+	-- 4. Attach the Schedule to the Job
+	EXEC msdb.dbo.sp_attach_schedule 
+		@job_id = @job_id, 
+		@schedule_name = @schedule_name;
+
+	-- 5. Target the Job to the local server
+	EXEC msdb.dbo.sp_add_jobserver 
+		@job_id = @job_id, 
+		@server_name = N'(local)';
+
+	PRINT 'Job [' + @job_name + '] created.';
+
+END;
+GO
+
+PRINT 'Stored procedure [create_job] created.';
+GO
+
+
+EXEC dbo.create_job 
+	@job_name = N'Backup Databases',
+	@description = N'Backup databases every 4 hours',
+	@subsystem = N'TSQL', 
+	@command = N'EXEC dbo.backup_all_databases;', 
+	@freq_type = 4, -- daily
+	@freq_interval = 1, 
+	@freq_subday_type = 8, -- hours
+	@freq_subday_interval = 4, -- every 4 hours
+	@active_start_time = 000000; -- Start at midnight (HHMMSS)
