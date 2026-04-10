@@ -1,12 +1,10 @@
--- Create backup_all_databases stored procedure in [tools]
 USE [tools];
 GO
 
 CREATE OR ALTER PROCEDURE [backup_all_databases] AS
 BEGIN
-
-	DECLARE @dailyBackupDir   VARCHAR(50) = 'H:\Backup\Daily';
-	DECLARE @hourlyBackupDir  VARCHAR(50) = 'H:\Backup\Hourly';
+	DECLARE @dailyBackupDir   VARCHAR(50) = 'F:\Backup\Daily';
+	DECLARE @hourlyBackupDir  VARCHAR(50) = 'F:\Backup\Hourly';
 	DECLARE @backupdir        VARCHAR(50);
 	DECLARE @dbname           VARCHAR(50);
 	DECLARE @filepath         VARCHAR(50);
@@ -46,7 +44,6 @@ BEGIN
 	SET @dbname = 'tosca_test_data';
 	SET @filepath = @backupdir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
-
 END;
 GO
 
@@ -123,6 +120,7 @@ BEGIN
 	EXEC dbo.delete_schedule_if_exists @schedule_name = @schedule_name;
 	EXEC dbo.delete_job_if_exists @job_name = @job_name;
 
+	-- 1. Create the Job
 	EXEC msdb.dbo.sp_add_job 
 		@job_name = @job_name, 
 		@enabled = 1, 
@@ -136,10 +134,10 @@ BEGIN
 		@subsystem = @subsystem, 
 		@command = @command, 
 		@database_name = N'tools',
-		@retry_attempts = 1,
+		@retry_attempts = 0,
 		@retry_interval = 5;
 
-	-- 3. Create the Schedule (Every day, every 4 hours)
+	-- 3. Create the Schedule
 	EXEC msdb.dbo.sp_add_schedule 
 		@schedule_name = @schedule_name, 
 		@freq_type = @freq_type,
@@ -177,3 +175,21 @@ EXEC dbo.create_job
 	@freq_subday_type = 8, -- hours
 	@freq_subday_interval = 4, -- every 4 hours
 	@active_start_time = 000000; -- Start at midnight (HHMMSS)
+
+EXEC dbo.create_job 
+	@job_name = N'Cleanup Old Backups',
+	@description = N'Cleanup old backups everyday at 2 AM',
+	@subsystem = N'PowerShell', 
+	@command = N'
+		$DailyBackupDir = "F:\Backup\Daily"
+		$HourlyBackupDir = "F:\Backup\Hourly"
+		$DailyBackupRetention = 2 # number of days
+		$HourlyBackupRetention = 2 # number of days
+		Get-ChildItem $DailyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$DailyBackupRetention) } | Remove-Item -Recurse -Force
+		Get-ChildItem $HourlyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$HourlyBackupRetention) } | Remove-Item -Recurse -Force
+	',
+	@freq_type = 4, -- daily
+	@freq_interval = 1, 
+	@freq_subday_type = 1, -- At the specified time
+	@freq_subday_interval = 0,
+	@active_start_time = 020000; -- 2 AM
