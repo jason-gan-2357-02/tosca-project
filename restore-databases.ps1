@@ -1,11 +1,24 @@
-$BackupDir = "F:\Backup\Hourly\2026-0411-232459"
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory = $true, HelpMessage = "Please provide backup directory.")]
+    [ValidateNotNullOrEmpty()]
+    # This block ensures the path actually exists and is a folder (not a file)
+    [ValidateScript({
+        if (Test-Path $_ -PathType Container) {
+            $true
+        } else {
+            throw "The path '$_' does not exist or is not a directory."
+        }
+    })]
+    [string]$BackupDirectory
+)
 
 function Restore-Database {
     param(
         [string]$DatabaseName
     )
     Write-Host "Restoring database $DatabaseName..."
-    $FilePath = "$BackupDir\$DatabaseName.bak"
+    $FilePath = "$BackupDirectory\$DatabaseName.bak"
     if ($DatabaseName -eq "master") {
         sqlcmd -C -Q "RESTORE DATABASE $DatabaseName FROM DISK = '$FilePath' WITH RECOVERY, REPLACE"
     } else {
