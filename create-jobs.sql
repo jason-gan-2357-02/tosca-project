@@ -3,11 +3,11 @@ GO
 
 CREATE OR ALTER PROCEDURE [backup_all_databases] AS
 BEGIN
-	DECLARE @dailyBackupDir   VARCHAR(50) = 'F:\Backup\Daily';
-	DECLARE @hourlyBackupDir  VARCHAR(50) = 'F:\Backup\Hourly';
-	DECLARE @backupdir        VARCHAR(50);
-	DECLARE @dbname           VARCHAR(50);
-	DECLARE @filepath         VARCHAR(50);
+	DECLARE @dailyBackupDir   VARCHAR(100) = 'F:\Backup\Daily';
+	DECLARE @hourlyBackupDir  VARCHAR(100) = 'F:\Backup\Hourly';
+	DECLARE @backupdir        VARCHAR(100);
+	DECLARE @dbname           VARCHAR(100);
+	DECLARE @filepath         VARCHAR(100);
 	DECLARE @rightnow         DATETIME = GETDATE();
 
 	IF DATEPART(HOUR, @rightnow) = 0 
