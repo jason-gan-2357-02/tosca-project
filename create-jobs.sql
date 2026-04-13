@@ -183,10 +183,10 @@ EXEC dbo.create_job
 	@command = N'
 		$DailyBackupDir = "H:\Backup\Daily"
 		$HourlyBackupDir = "H:\Backup\Hourly"
-		$DailyBackupRetention = 3 # number of days
-		$HourlyBackupRetention = 15 # number of days
-		Get-ChildItem $DailyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$DailyBackupRetention) } | Remove-Item -Recurse -Force
-		Get-ChildItem $HourlyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$HourlyBackupRetention) } | Remove-Item -Recurse -Force
+		$DailyBackupRetention = 15 # number of days
+		$HourlyBackupRetention = 2 # number of days
+		Get-ChildItem $DailyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).Date.AddDays(-$DailyBackupRetention) } | Remove-Item -Recurse -Force
+		Get-ChildItem $HourlyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).Date.AddDays(-$HourlyBackupRetention) } | Remove-Item -Recurse -Force
 	',
 	@freq_type = 4, -- daily
 	@freq_interval = 1, 
