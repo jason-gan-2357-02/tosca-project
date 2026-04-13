@@ -3,8 +3,8 @@ GO
 
 CREATE OR ALTER PROCEDURE [backup_all_databases] AS
 BEGIN
-	DECLARE @dailyBackupDir   VARCHAR(100) = 'F:\Backup\Daily';
-	DECLARE @hourlyBackupDir  VARCHAR(100) = 'F:\Backup\Hourly';
+	DECLARE @dailyBackupDir   VARCHAR(100) = 'H:\Backup\Daily';
+	DECLARE @hourlyBackupDir  VARCHAR(100) = 'H:\Backup\Hourly';
 	DECLARE @backupdir        VARCHAR(100);
 	DECLARE @dbname           VARCHAR(100);
 	DECLARE @filepath         VARCHAR(100);
@@ -181,10 +181,10 @@ EXEC dbo.create_job
 	@description = N'Cleanup old backups everyday at 2 AM',
 	@subsystem = N'PowerShell', 
 	@command = N'
-		$DailyBackupDir = "F:\Backup\Daily"
-		$HourlyBackupDir = "F:\Backup\Hourly"
-		$DailyBackupRetention = 2 # number of days
-		$HourlyBackupRetention = 2 # number of days
+		$DailyBackupDir = "H:\Backup\Daily"
+		$HourlyBackupDir = "H:\Backup\Hourly"
+		$DailyBackupRetention = 3 # number of days
+		$HourlyBackupRetention = 15 # number of days
 		Get-ChildItem $DailyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$DailyBackupRetention) } | Remove-Item -Recurse -Force
 		Get-ChildItem $HourlyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$HourlyBackupRetention) } | Remove-Item -Recurse -Force
 	',
