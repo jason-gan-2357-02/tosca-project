@@ -1,42 +1,48 @@
 USE [tools];
 GO
 
-DECLARE @hourlyBackupDir  VARCHAR(100) = 'H:\Backup\Hourly';
-DECLARE @dailyBackupDir   VARCHAR(100) = 'H:\Backup\Daily';
-DECLARE @firstBackupTime  INT          = 123000; -- 12:30 PM
-DECLARE @backupInterval   INT          = 7;      -- every 7 hours
-DECLARE @lastBackupHour   INT          = 19;     -- 7 PM
+DECLARE @dayBackupDir         VARCHAR(100) = 'H:\Backup\Day';
+DECLARE @dayBackupTime        INT          = 123000; -- 12:30 PM
+DECLARE @dayBackupRetention   INT          = 2;      --  2 days
 
-DECLARE @command VARCHAR(MAX) = CONCAT('EXEC dbo.backup_all_databases ',
-	'@hourlyBackupDir = "', @hourlyBackupDir, '", ',
-	'@dailyBackupDir = "', @dailyBackupDir, '", ',
-	'@lastBackupHour = ', @lastBackupHour);
+DECLARE @nightBackupDir       VARCHAR(100) = 'H:\Backup\Night';
+DECLARE @nightBackupTime      INT          = 193000; --  7:30 PM
+DECLARE @nightBackupRetention INT          = 15;     -- 15 days
 
-EXEC dbo.create_job 
-	@job_name = N'Backup Databases',
-	@description = N'Backup databases',
-	@subsystem = N'TSQL', 
-	@command = @command,
-	@freq_type = 4, -- daily
-	@freq_interval = 1, 
-	@freq_subday_type = 8, -- hours
-	@freq_subday_interval = @backupInterval,
-	@active_start_time = @firstBackupTime;
+DECLARE @cleanupTime          INT          = 223000; -- 10:30 PM
 
-EXEC dbo.create_job 
-	@job_name = N'Cleanup Old Backups',
-	@description = N'Cleanup old backups everyday at 2 AM',
-	@subsystem = N'PowerShell', 
-	@command = N'
-		$DailyBackupDir = "H:\Backup\Daily"
-		$HourlyBackupDir = "H:\Backup\Hourly"
-		$DailyBackupRetention = 15 # number of days
-		$HourlyBackupRetention = 2 # number of days
-		Get-ChildItem $DailyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).Date.AddDays(-$DailyBackupRetention) } | Remove-Item -Recurse -Force
-		Get-ChildItem $HourlyBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).Date.AddDays(-$HourlyBackupRetention) } | Remove-Item -Recurse -Force
-	',
-	@freq_type = 4, -- daily
-	@freq_interval = 1, 
-	@freq_subday_type = 1, -- At the specified time
-	@freq_subday_interval = 0,
-	@active_start_time = 020000; -- 2 AM
+DECLARE @dayBackupCommand VARCHAR(MAX) =
+	CONCAT('EXEC dbo.backup_databases @backup_dir = "', @dayBackupDir, '"');
+
+EXEC dbo.create_daily_job 
+	@job_name = 'Backup Day',
+	@subsystem = 'TSQL', 
+	@command = @dayBackupCommand,
+	@time = @dayBackupTime,
+	@sunday = 0; -- exclude Sunday
+
+DECLARE @nightBackupCommand VARCHAR(MAX) = 
+	CONCAT('EXEC dbo.backup_databases @backup_dir = "', @nightBackupDir, '"');
+
+EXEC dbo.create_daily_job 
+	@job_name = 'Backup Night',
+	@subsystem = 'TSQL', 
+	@command = @nightBackupCommand,
+	@time = @nightBackupTime,
+	@sunday = 0; -- exclude Sunday
+
+DECLARE @cleanupCommand VARCHAR(MAX) = CONCAT(
+	'$DayBackupDir = "', @dayBackupDir, '"', CHAR(13), CHAR(10),
+	'$DayBackupRetention = ', @dayBackupRetention, CHAR(13), CHAR(10),
+	'$NightBackupDir = "', @nightBackupDir, '"', CHAR(13), CHAR(10),
+	'$NightBackupRetention = ', @nightBackupRetention, CHAR(13), CHAR(10),
+	'Get-ChildItem $DayBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).Date.AddDays(-$DayBackupRetention) } | Remove-Item -Recurse -Force', CHAR(13), CHAR(10),
+	'Get-ChildItem $NightBackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).Date.AddDays(-$NightBackupRetention) } | Remove-Item -Recurse -Force', CHAR(13), CHAR(10)
+);
+
+EXEC dbo.create_daily_job 
+	@job_name = 'Cleanup Old Backups',
+	@subsystem = 'PowerShell', 
+	@command = @cleanupCommand,
+	@time = @cleanupTime,
+	@sunday = 0; -- exclude Sunday

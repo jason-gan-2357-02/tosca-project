@@ -1,55 +1,45 @@
 USE [tools];
 GO
 
-CREATE OR ALTER PROCEDURE [backup_all_databases] 
-	@hourlyBackupDir VARCHAR(100),
-	@dailyBackupDir VARCHAR(100),
-	@lastBackupHour INT
+CREATE OR ALTER PROCEDURE [backup_databases] 
+	@backup_dir VARCHAR(100)
 AS
 BEGIN
-	DECLARE @backupdir        VARCHAR(100);
 	DECLARE @dbname           VARCHAR(100);
 	DECLARE @filepath         VARCHAR(100);
 	DECLARE @rightnow         DATETIME = GETDATE();
 
-	IF DATEPART(HOUR, @rightnow) = @lastBackupHour 
-	BEGIN
-		SET @backupdir = @dailyBackupDir + '\' + FORMAT(@rightnow, 'yyyy-MMdd-HHmmss');
-	END 
-	ELSE
-	BEGIN
-		SET @backupdir = @hourlyBackupDir + '\' + FORMAT(@rightnow, 'yyyy-MMdd-HHmmss');
-	END
+	SET @backup_dir = @backup_dir + '\' + FORMAT(GETDATE(), 'yyyy-MMdd-HHmmss');
 
-	EXEC master.sys.xp_create_subdir @backupdir;
+	EXEC master.sys.xp_create_subdir @backup_dir;
 
 	SET @dbname = 'master';
-	SET @filepath = @backupdir + '\' + @dbname + '.bak';
+	SET @filepath = @backup_dir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
 	SET @dbname = 'model';
-	SET @filepath = @backupdir + '\' + @dbname + '.bak';
+	SET @filepath = @backup_dir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
 	SET @dbname = 'msdb';
-	SET @filepath = @backupdir + '\' + @dbname + '.bak';
+	SET @filepath = @backup_dir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
 	SET @dbname = 'tools';
-	SET @filepath = @backupdir + '\' + @dbname + '.bak';
+	SET @filepath = @backup_dir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
 	SET @dbname = 'tosca_common';
-	SET @filepath = @backupdir + '\' + @dbname + '.bak';
+	SET @filepath = @backup_dir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 
 	SET @dbname = 'tosca_test_data';
-	SET @filepath = @backupdir + '\' + @dbname + '.bak';
+	SET @filepath = @backup_dir + '\' + @dbname + '.bak';
 	BACKUP DATABASE @dbname TO DISK = @filepath WITH INIT, COMPRESSION, STATS = 10;
 END;
 GO
 
-PRINT 'Stored procedure [backup_all_databases] created.';
+PRINT 'Stored procedure [backup_databases] created.';
 GO
 
 CREATE OR ALTER PROCEDURE [delete_schedule_if_exists] 
@@ -102,22 +92,33 @@ GO
 PRINT 'Stored procedure [delete_job_if_exists] created.';
 GO
 
-CREATE OR ALTER PROCEDURE [create_job] 
-	@job_name NVARCHAR(50),
-	@description NVARCHAR(255),
-	@subsystem NVARCHAR(50),
-	@command NVARCHAR(MAX),
-	@freq_type INT, -- daily
-	@freq_interval INT, 
-	@freq_subday_type INT,
-	@freq_subday_interval INT,
-	@active_start_time INT
+CREATE OR ALTER PROCEDURE [create_daily_job] 
+	@job_name VARCHAR(50),
+	@subsystem VARCHAR(50),
+	@command VARCHAR(MAX),
+	@time INT,
+	@sunday BIT = 1,
+	@monday BIT = 1,
+	@tuesday BIT = 1,
+	@wednesday BIT = 1,
+	@thursday BIT = 1,
+	@friday BIT = 1,
+	@saturday BIT = 1
 AS
 BEGIN
 
 	DECLARE @job_id BINARY(16);
-	DECLARE @schedule_name NVARCHAR(50) = @job_name + ' Schedule';
-	DECLARE @stepName NVARCHAR(50) = @job_name + ' Step';
+	DECLARE @schedule_name VARCHAR(50) = @job_name + ' Schedule';
+	DECLARE @step_name VARCHAR(50) = @job_name + ' Step';
+	DECLARE @days_of_week INT = 0;
+
+	IF @sunday = 1 BEGIN SET @days_of_week = @days_of_week + 1; END;
+	IF @monday = 1 BEGIN SET @days_of_week = @days_of_week + 2; END;
+	IF @tuesday = 1 BEGIN SET @days_of_week = @days_of_week + 4; END;
+	IF @wednesday = 1 BEGIN SET @days_of_week = @days_of_week + 8; END;
+	IF @thursday = 1 BEGIN SET @days_of_week = @days_of_week + 16; END;
+	IF @friday = 1 BEGIN SET @days_of_week = @days_of_week + 32; END;
+	IF @saturday = 1 BEGIN SET @days_of_week = @days_of_week + 64; END;
 
 	EXEC dbo.delete_schedule_if_exists @schedule_name = @schedule_name;
 	EXEC dbo.delete_job_if_exists @job_name = @job_name;
@@ -126,27 +127,26 @@ BEGIN
 	EXEC msdb.dbo.sp_add_job 
 		@job_name = @job_name, 
 		@enabled = 1, 
-		@description = @description,
+		@description = @job_name,
 		@job_id = @job_id OUTPUT;
 
 	-- 2. Add the Step
 	EXEC msdb.dbo.sp_add_jobstep 
 		@job_id = @job_id, 
-		@step_name = @stepName, 
+		@step_name = @step_name, 
 		@subsystem = @subsystem, 
 		@command = @command, 
-		@database_name = N'tools',
+		@database_name = 'tools',
 		@retry_attempts = 0,
 		@retry_interval = 5;
 
 	-- 3. Create the Schedule
 	EXEC msdb.dbo.sp_add_schedule 
 		@schedule_name = @schedule_name, 
-		@freq_type = @freq_type,
-		@freq_interval = @freq_interval, 
-		@freq_subday_type = @freq_subday_type,
-		@freq_subday_interval = @freq_subday_interval,
-		@active_start_time = @active_start_time;
+		@freq_type = 8,
+		@freq_recurrence_factor = 1,
+		@freq_interval = @days_of_week, 
+		@active_start_time = @time;
 
 	-- 4. Attach the Schedule to the Job
 	EXEC msdb.dbo.sp_attach_schedule 
@@ -156,12 +156,12 @@ BEGIN
 	-- 5. Target the Job to the local server
 	EXEC msdb.dbo.sp_add_jobserver 
 		@job_id = @job_id, 
-		@server_name = N'(local)';
+		@server_name = '(local)';
 
 	PRINT 'Job [' + @job_name + '] created.';
 
 END;
 GO
 
-PRINT 'Stored procedure [create_job] created.';
+PRINT 'Stored procedure [create_daily_job] created.';
 GO
