@@ -22,7 +22,7 @@ if (Test-Path $TargetDirectory -PathType Container) {
 }
 
 New-Item -Path $StagingDirectory -ItemType Directory -Force
-Remove-Item -Path $StagingDirectory -Recurse -Force
+Remove-Item -Path $StagingDirectory\* -Recurse -Force
 Expand-Archive -Path $BackupFile -DestinationPath $StagingDirectory -Force
 robocopy $StagingDirectory $TargetDirectory /MIR /R:3 /W:5
-Remove-Item -Path $StagingDirectory -Recurse -Force
+Remove-Item -Path $StagingDirectory\* -Recurse -Force
