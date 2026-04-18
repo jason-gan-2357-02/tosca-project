@@ -92,10 +92,10 @@ GO
 PRINT 'Stored procedure [delete_job_if_exists] created.';
 GO
 
-CREATE OR ALTER PROCEDURE [create_daily_job] 
+CREATE OR ALTER PROCEDURE [create_daily_backup_job] 
 	@job_name VARCHAR(50),
-	@subsystem VARCHAR(50),
-	@command VARCHAR(MAX),
+	@backup_dir VARCHAR(100),
+	@retention INT,
 	@time INT,
 	@sunday BIT = 1,
 	@monday BIT = 1,
@@ -130,15 +130,35 @@ BEGIN
 		@description = @job_name,
 		@job_id = @job_id OUTPUT;
 
-	-- 2. Add the Step
+	DECLARE @backup_command VARCHAR(MAX) =
+		CONCAT('EXEC dbo.backup_databases @backup_dir = "', @backup_dir, '"');
+
+	-- 2.a. Add backup step
 	EXEC msdb.dbo.sp_add_jobstep 
 		@job_id = @job_id, 
-		@step_name = @step_name, 
-		@subsystem = @subsystem, 
-		@command = @command, 
+		@step_name = 'Backup Step', 
+		@subsystem = 'TSQL', 
+		@command = @backup_command, 
 		@database_name = 'tools',
-		@retry_attempts = 0,
-		@retry_interval = 5;
+		@retry_attempts = 2,
+		@retry_interval = 5,
+		@on_success_action = 3; -- on success, go to next step
+
+	DECLARE @cleanup_command VARCHAR(MAX) = CONCAT(
+		'$BackupDir = "', @backup_dir, '"', CHAR(13), CHAR(10),
+		'$Retention = ', @retention, CHAR(13), CHAR(10),
+		'Get-ChildItem $BackupDir -Directory | Where-Object { $_.LastWriteTime -lt (Get-Date).Date.AddDays(-$Retention) } | Remove-Item -Recurse -Force', CHAR(13), CHAR(10)
+	);
+
+	-- 2.b. Add cleanup step
+	EXEC msdb.dbo.sp_add_jobstep 
+		@job_id = @job_id, 
+		@step_name = 'Cleanup Step', 
+		@subsystem = 'PowerShell', 
+		@command = @cleanup_command, 
+		@database_name = 'tools',
+		@retry_attempts = 2,
+		@retry_interval = 5;		
 
 	-- 3. Create the Schedule
 	EXEC msdb.dbo.sp_add_schedule 
@@ -163,5 +183,5 @@ BEGIN
 END;
 GO
 
-PRINT 'Stored procedure [create_daily_job] created.';
+PRINT 'Stored procedure [create_daily_backup_job] created.';
 GO
