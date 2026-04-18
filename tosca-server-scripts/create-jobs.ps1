@@ -46,11 +46,16 @@ function Add-Backup-Job {
 
     $Settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 
+    $Principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" `
+        -LogonType ServiceAccount `
+        -RunLevel Highest
+
     Register-ScheduledTask -TaskName $TaskName `
         -Action $Action `
         -Trigger $Trigger `
         -Settings $Settings `
         -Description $TaskName `
+        -Principal $Principal `
         -Force
 
     Write-Host "Task '$TaskName' has been created successfully." -ForegroundColor Green
