@@ -1,28 +1,28 @@
 [CmdletBinding()]
-
-$storageDir = "F:\Tosca_Storage"
-$tempDir = "F:\AttachmentsTemp"
-
 param (
     [Parameter(Mandatory = $true, HelpMessage = "Please provide backup file.")]
     [ValidateNotNullOrEmpty()]
-    # This block ensures the path actually exists and is a file
     [ValidateScript({
         if (Test-Path $_ -PathType Leaf) {
             $true
         } else {
-            throw "The path '$_' does not exist or is not a file."
+            throw "The backup file '$_' does not exist or is not a file."
         }
     })]
     [string]$BackupFile
 )
 
-if (Test-Path -Path $tempDir) {
-    Write-Host "Directory $($tempDir) exists. Deleting it..."
-    Remove-Item -Path $tempDir -Recurse -Force
-}
-New-Item -Path $tempDir -ItemType Directory -Force
-Expand-Archive -Path $backupFile -DestinationPath $tempDir -Force
-robocopy $tempDir $storageDir /MIR /R:3 /W:5
-Remove-Item -Path $tempDir -Recurse -Force
+$TargetDirectory = "F:\Tosca_Storage"
+$StagingDirectory = "F:\Tosca_Storage_Staging"
 
+if (Test-Path $TargetDirectory -PathType Container) {
+    $true
+} else {
+    throw "The target directory '$TargetDirectory' does not exist or is not a directory."
+}
+
+New-Item -Path $StagingDirectory -ItemType Directory -Force
+Remove-Item -Path $StagingDirectory -Recurse -Force
+Expand-Archive -Path $BackupFile -DestinationPath $StagingDirectory -Force
+robocopy $StagingDirectory $TargetDirectory /MIR /R:3 /W:5
+Remove-Item -Path $StagingDirectory -Recurse -Force
