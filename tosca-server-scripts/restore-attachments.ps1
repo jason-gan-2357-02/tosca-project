@@ -1,4 +1,8 @@
 [CmdletBinding()]
+
+$storageDir = "F:\Tosca_Storage"
+$tempDir = "F:\AttachmentsTemp"
+
 param (
     [Parameter(Mandatory = $true, HelpMessage = "Please provide backup file.")]
     [ValidateNotNullOrEmpty()]
@@ -12,9 +16,6 @@ param (
     })]
     [string]$BackupFile
 )
-
-$storageDir = "F:\Tosca_Storage"
-$tempDir = "F:\AttachmentsTemp"
 
 if (Test-Path -Path $tempDir) {
     Write-Host "Directory $($tempDir) exists. Deleting it..."
