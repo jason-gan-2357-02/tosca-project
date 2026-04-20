@@ -1,18 +1,18 @@
 function Main {
     Add-Backup-Job `
         -TaskName "Backup Day" `
-        -SourceDirectory "F:\Tosca_Storage" `
-        -MirrorDirectory "F:\Tosca_Storage_Mirror" `
-        -BackupDirectory "F:\Backup\Day" `
+        -SourceDirectory "G:\Tosca_Storage" `
+        -MirrorDirectory "G:\Backup_Staging" `
+        -BackupDirectory "G:\Backup\Day" `
         -DaysOfWeek "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" `
         -Time "12:30PM" `
         -Retention 2
 
     Add-Backup-Job `
         -TaskName "Backup Night" `
-        -SourceDirectory "F:\Tosca_Storag" `
-        -MirrorDirectory "F:\Tosca_Storage_Mirror" `
-        -BackupDirectory "F:\Backup\Night" `
+        -SourceDirectory "G:\Tosca_Storage" `
+        -MirrorDirectory "G:\Backup_Staging" `
+        -BackupDirectory "G:\Backup\Night" `
         -DaysOfWeek "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" `
         -Time "7:30PM" `
         -Retention 15

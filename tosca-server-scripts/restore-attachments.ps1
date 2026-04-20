@@ -12,8 +12,8 @@ param (
     [string]$BackupFile
 )
 
-$TargetDirectory = "F:\Tosca_Storage"
-$StagingDirectory = "F:\Tosca_Storage_Staging"
+$TargetDirectory = "G:\Tosca_Storage"
+$StagingDirectory = "G:\Restore_Staging"
 
 if (Test-Path $TargetDirectory -PathType Container) {
     $true
