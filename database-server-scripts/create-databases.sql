@@ -38,55 +38,55 @@ END
 GO
 
 -- Create server login
-IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = 'tosca_user')
+IF NOT EXISTS (SELECT * FROM sys.server_principals WHERE name = 'tosca_app')
 BEGIN
-    CREATE LOGIN [tosca_user] 
+    CREATE LOGIN [tosca_app] 
     WITH PASSWORD = 'ToscaUserPassword123$', 
     DEFAULT_DATABASE = [tosca_common],
     CHECK_EXPIRATION = OFF,
     CHECK_POLICY = ON;
-    PRINT 'Login [tosca_user] created.';
+    PRINT 'Login [tosca_app] created.';
 END
 ELSE
 BEGIN
-    PRINT 'Login [tosca_user] already exists.';
+    PRINT 'Login [tosca_app] already exists.';
 END
 GO
 
--- Grant [tosca_user] full access to [tosca_common]
+-- Grant [tosca_app] full access to [tosca_common]
 USE [tosca_common];
 GO
 
-IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'tosca_user')
+IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'tosca_app')
 BEGIN
-    CREATE USER [tosca_user] FOR LOGIN [tosca_user];
+    CREATE USER [tosca_app] FOR LOGIN [tosca_app];
     
     -- Add user to the db_owner role for full access
-    ALTER ROLE [db_owner] ADD MEMBER [tosca_user];
+    ALTER ROLE [db_owner] ADD MEMBER [tosca_app];
     
-    PRINT 'User [tosca_user] created in [tosca_common] and granted db_owner permissions.';
+    PRINT 'User [tosca_app] created in [tosca_common] and granted db_owner permissions.';
 END
 ELSE
 BEGIN
-    PRINT 'User [tosca_user] already exists in [tosca_common].';
+    PRINT 'User [tosca_app] already exists in [tosca_common].';
 END
 GO
 
--- Grant [tosca_user] full access to [tosca_test_data]
+-- Grant [tosca_app] full access to [tosca_test_data]
 USE [tosca_test_data];
 GO
 
-IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'tosca_user')
+IF NOT EXISTS (SELECT * FROM sys.database_principals WHERE name = 'tosca_app')
 BEGIN
-    CREATE USER [tosca_user] FOR LOGIN [tosca_user];
+    CREATE USER [tosca_app] FOR LOGIN [tosca_app];
     
     -- Add user to the db_owner role for full access
-    ALTER ROLE [db_owner] ADD MEMBER [tosca_user];
+    ALTER ROLE [db_owner] ADD MEMBER [tosca_app];
     
-    PRINT 'User [tosca_user] created in [tosca_test_data] and granted db_owner permissions.';
+    PRINT 'User [tosca_app] created in [tosca_test_data] and granted db_owner permissions.';
 END
 ELSE
 BEGIN
-    PRINT 'User [tosca_user] already exists in [tosca_test_data].';
+    PRINT 'User [tosca_app] already exists in [tosca_test_data].';
 END
 GO
