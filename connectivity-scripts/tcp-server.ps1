@@ -1,4 +1,10 @@
-$port = 8080
+[CmdletBinding()]
+param (
+    [Parameter(Mandatory = $true, HelpMessage = "Please provide server port.")]
+    [ValidateNotNullOrEmpty()]
+    [int]$Port
+)
+
 $endpoint = [System.Net.IPAddress]::Any
 $listener = New-Object System.Net.Sockets.TcpListener($endpoint, $port)
 
