@@ -6,7 +6,7 @@ Instructions on setting up SQL Server for Tosca in BSP:
   sqlcmd -C -i create-databases.sql
 
 3. Change the password of tosca_app:
-  sqlcmd -Command -Q "ALTER LOGIN [tosca_app] WITH PASSWORD = 'TheNewPassword';"
+  sqlcmd -C -Q "ALTER LOGIN [tosca_app] WITH PASSWORD = 'TheNewPassword';"
 
 4. In Command Prompt run the create-procedures.sql script:
   sqlcmd -C -i create-procedures.sql
